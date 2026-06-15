@@ -4,6 +4,7 @@ import cors from "cors";
 import reviewRoutes from "./routes/review.route";
 import analyzeRoutes from "./routes/analyze.route";
 import jobRoutes from "./routes/job.route";
+import reviewMatchRoutes from "./routes/review-match.route";
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(express.json());
 app.use("/api", reviewRoutes);
 app.use("/api", analyzeRoutes);
 app.use("/api", jobRoutes);
+app.use("/api", reviewMatchRoutes);
 
 app.get("/api/health", (_, res) => {
   res.json({
