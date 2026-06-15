@@ -7,17 +7,18 @@ router.post("/analyze-resume", async (req, res) => {
   try {
     const { resumeText } = req.body;
 
-    const result = await analyzeResume(resumeText);
+    const structuredResume = await analyzeResume(resumeText);
 
     res.json({
       success: true,
-      data: result,
+      data: structuredResume,
     });
   } catch (error) {
     console.error(error);
 
     res.status(500).json({
       success: false,
+      message: "Failed to analyze resume",
     });
   }
 });
