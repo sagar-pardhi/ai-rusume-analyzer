@@ -15,6 +15,11 @@ Return ONLY valid JSON.
     }
   ],
   "education": [],
-  "projects": []
+  "projects": [
+    {
+      "name": "",
+      "description": "",
+    }
+  ]
 }
 `;

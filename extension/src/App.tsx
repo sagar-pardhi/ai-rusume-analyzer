@@ -118,12 +118,34 @@ function App() {
   };
 
   return (
-    <div className="p-4 w-[400px]">
-      <h1 className="font-bold text-lg">AI Resume Reviewer</h1>
+    <div className="w-[420px] min-h-[600px] bg-white p-4">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold">AI Resume Reviewer</h1>
+
+        <p className="text-sm text-gray-500">Analyze Naukri jobs instantly</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="rounded-lg border p-3">
+          <div className="text-sm text-gray-500">Resume</div>
+
+          <div className="font-medium">
+            {resume ? "✅ Uploaded" : "❌ Missing"}
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-3">
+          <div className="text-sm text-gray-500">Job</div>
+
+          <div className="font-medium">
+            {jobData ? "✅ Extracted" : "❌ Missing"}
+          </div>
+        </div>
+      </div>
 
       <button
         onClick={extractJob}
-        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+        className="w-full rounded-lg bg-black px-4 py-2 text-white"
       >
         Extract Job
       </button>
@@ -180,7 +202,12 @@ function App() {
         }}
       />
 
-      <button onClick={analyze}>Analyze Resume</button>
+      <button
+        onClick={analyze}
+        className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
+      >
+        Analyze Resume
+      </button>
 
       {resumeText && (
         <textarea
@@ -198,52 +225,58 @@ function App() {
 
       {review && (
         <>
-          <div
-            style={{
-              marginTop: "16px",
-            }}
-          >
-            <h2>Match Score: {review?.matchScore}%</h2>
+          {review && (
+            <div className="mt-4 rounded-xl border p-4">
+              <div className="text-sm text-gray-500">Match Score</div>
 
-            <h3>{review?.shouldApply ? "✅ Apply" : "❌ Skip"}</h3>
-
-            <p>{review?.summary}</p>
-          </div>
+              <div className="text-4xl font-bold">{review.matchScore}%</div>
+            </div>
+          )}
 
           {review?.strengths?.length > 0 && (
-            <>
-              <h4>Strengths</h4>
+            <div className="mt-4 rounded-xl border p-4">
+              <h3 className="font-semibold mb-2">Strengths</h3>
 
-              <ul>
-                {review?.strengths?.map((strength) => (
-                  <li key={strength}>✅ {strength}</li>
+              <ul className="space-y-2">
+                {review.strengths.map((item) => (
+                  <li key={item}>✅ {item}</li>
                 ))}
               </ul>
-            </>
+            </div>
           )}
 
           {review?.missingSkills?.length > 0 && (
-            <>
-              <h4>Missing Skills</h4>
+            <div className="mt-4 rounded-xl border p-4">
+              <h3 className="font-semibold mb-2">Missing Skills</h3>
 
-              <ul>
-                {review?.missingSkills?.map((skill) => (
-                  <li key={skill}>❌ {skill}</li>
+              <ul className="space-y-2">
+                {review.missingSkills.map((item) => (
+                  <li key={item}>❌ {item}</li>
                 ))}
               </ul>
-            </>
+            </div>
+          )}
+
+          {review && (
+            <div
+              className={`mt-3 rounded-lg p-3 font-medium ${
+                review.shouldApply ? "bg-green-100" : "bg-red-100"
+              }`}
+            >
+              {review.shouldApply ? "🚀 Strong Apply" : "⚠️ Skip"}
+            </div>
           )}
 
           {review?.recommendations?.length > 0 && (
-            <>
-              <h4>Recommendations</h4>
+            <div className="mt-4 rounded-xl border p-4">
+              <h3 className="font-semibold mb-2">Recommendations</h3>
 
-              <ul>
-                {review?.recommendations?.map((item) => (
+              <ul className="space-y-2">
+                {review.recommendations.map((item) => (
                   <li key={item}>💡 {item}</li>
                 ))}
               </ul>
-            </>
+            </div>
           )}
         </>
       )}
