@@ -13,10 +13,17 @@ interface ReviewResult {
 function App() {
   const [jobData, setJobData] = useState<JobDetails | null | undefined>(null);
   const [resume, setResume] = useState<File | null>(null);
-  const [resumeText, setResumeText] = useState("");
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
+
+  // useEffect(() => {
+  //   chrome.storage.local.get(["structuredResume"], (result) => {
+  //     if (result.structuredResume) {
+  //       setSavedResume(result.structuredResume);
+  //     }
+  //   });
+  // }, []);
 
   useEffect(() => {
     const extractJob = async () => {
@@ -121,8 +128,12 @@ function App() {
         throw new Error(data.message || "Analysis failed");
       }
 
-      setReview(data.data);
-      setResumeText(data.text);
+      console.log(data);
+
+      setReview(data.data.review);
+      // chrome.storage.local.set({
+      //   structuredResume: data.data.structuredResume,
+      // });
     } catch (error) {
       console.error(error);
 
@@ -190,15 +201,13 @@ function App() {
             ))}
           </ul>
 
-          <pre
-            style={{
-              maxHeight: 200,
-              overflow: "auto",
-              fontSize: 10,
-            }}
-          >
-            {jobData.description}
-          </pre>
+          <div className="mt-3">
+            <strong>Job Description</strong>
+
+            <p className="mt-2 rounded-lg border p-3 text-sm">
+              {jobData.description}
+            </p>
+          </div>
         </div>
       )}
 
@@ -220,18 +229,6 @@ function App() {
       >
         Analyze Resume
       </button>
-
-      {resumeText && (
-        <textarea
-          value={resumeText}
-          readOnly
-          rows={10}
-          style={{
-            width: "100%",
-            marginTop: "1rem",
-          }}
-        />
-      )}
 
       {loading && <div>Analyzing Resume...</div>}
 

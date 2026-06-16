@@ -23,7 +23,11 @@ export async function analyzeApplication(
 
     const review = await reviewMatch(structuredResume, structuredJob);
 
-    return review;
+    return {
+      review,
+      structuredResume,
+      structuredJob,
+    };
   } finally {
     await parser.destroy();
   }
