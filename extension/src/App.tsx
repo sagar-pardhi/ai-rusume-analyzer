@@ -1,10 +1,21 @@
 import { useState } from "react";
 import type { JobDetails } from "./types/job";
 
+interface ReviewResult {
+  matchScore: number;
+  strengths: string[];
+  missingSkills: string[];
+  recommendations: string[];
+  shouldApply: boolean;
+  summary: string;
+}
+
 function App() {
   const [jobData, setJobData] = useState<JobDetails | null | undefined>(null);
   const [resume, setResume] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
+  const [review, setReview] = useState<ReviewResult | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const extractJob = async () => {
     const [tab] = await chrome.tabs.query({
@@ -64,26 +75,46 @@ function App() {
     setJobData(result[0].result);
   };
 
-  const analyzeResume = async () => {
-    if (!resume) {
-      alert("Please upload a resume");
-      return;
+  const analyze = async () => {
+    try {
+      if (!resume) {
+        alert("Upload resume first");
+        return;
+      }
+
+      if (!jobData?.description) {
+        alert("Extract job first");
+        return;
+      }
+
+      setLoading(true);
+
+      const formData = new FormData();
+
+      formData.append("resume", resume);
+
+      formData.append("jobDescription", jobData.description);
+
+      const response = await fetch("http://localhost:5000/api/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Analysis failed");
+      }
+
+      setReview(data.data);
+      setResumeText(data.text);
+    } catch (error) {
+      console.error(error);
+
+      alert("Failed to analyze");
+    } finally {
+      setLoading(false);
     }
-
-    const formData = new FormData();
-
-    formData.append("resume", resume);
-
-    const response = await fetch("http://localhost:5000/api/review", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-
-    console.log(data);
-
-    setResumeText(data.text);
   };
 
   return (
@@ -149,7 +180,7 @@ function App() {
         }}
       />
 
-      <button onClick={analyzeResume}>Analyze Resume</button>
+      <button onClick={analyze}>Analyze Resume</button>
 
       {resumeText && (
         <textarea
@@ -161,6 +192,60 @@ function App() {
             marginTop: "1rem",
           }}
         />
+      )}
+
+      {loading && <div>Analyzing Resume...</div>}
+
+      {review && (
+        <>
+          <div
+            style={{
+              marginTop: "16px",
+            }}
+          >
+            <h2>Match Score: {review?.matchScore}%</h2>
+
+            <h3>{review?.shouldApply ? "✅ Apply" : "❌ Skip"}</h3>
+
+            <p>{review?.summary}</p>
+          </div>
+
+          {review?.strengths?.length > 0 && (
+            <>
+              <h4>Strengths</h4>
+
+              <ul>
+                {review?.strengths?.map((strength) => (
+                  <li key={strength}>✅ {strength}</li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {review?.missingSkills?.length > 0 && (
+            <>
+              <h4>Missing Skills</h4>
+
+              <ul>
+                {review?.missingSkills?.map((skill) => (
+                  <li key={skill}>❌ {skill}</li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {review?.recommendations?.length > 0 && (
+            <>
+              <h4>Recommendations</h4>
+
+              <ul>
+                {review?.recommendations?.map((item) => (
+                  <li key={item}>💡 {item}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
       )}
     </div>
   );
