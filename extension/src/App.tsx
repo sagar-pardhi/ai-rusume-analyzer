@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { JobDetails } from "./types/job";
 
 interface ReviewResult {
@@ -16,64 +16,79 @@ function App() {
   const [resumeText, setResumeText] = useState("");
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
 
-  const extractJob = async () => {
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+  useEffect(() => {
+    const extractJob = async () => {
+      try {
+        setExtracting(true);
 
-    if (!tab.id) return;
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
 
-    const result = await chrome.scripting.executeScript({
-      target: {
-        tabId: tab.id,
-      },
-      func: () => {
-        const title =
-          document.querySelector("#job_header h1")?.textContent?.trim() || "";
+        if (!tab.id) return;
 
-        const company =
-          document.querySelector("#job_header a")?.textContent?.trim() || "";
+        const result = await chrome.scripting.executeScript({
+          target: {
+            tabId: tab.id,
+          },
+          func: () => {
+            const title =
+              document.querySelector("#job_header h1")?.textContent?.trim() ||
+              "";
 
-        const experience =
-          document
-            .querySelector(
-              "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__exp-salary-container__NXsVd > div.styles_jhc__exp__k_giM > span",
-            )
-            ?.textContent?.trim() || "";
+            const company =
+              document.querySelector("#job_header a")?.textContent?.trim() ||
+              "";
 
-        const location =
-          document
-            .querySelector(
-              "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__loc___Du2H > span > a",
-            )
-            ?.textContent?.trim() || "";
+            const experience =
+              document
+                .querySelector(
+                  "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__exp-salary-container__NXsVd > div.styles_jhc__exp__k_giM > span",
+                )
+                ?.textContent?.trim() || "";
 
-        const skills = Array.from(
-          document.querySelectorAll(".styles_key-skill__GIPn_ a span"),
-        ).map((el) => el.textContent?.trim() || "");
+            const location =
+              document
+                .querySelector(
+                  "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__loc___Du2H > span > a",
+                )
+                ?.textContent?.trim() || "";
 
-        const description =
-          document
-            .querySelector(".styles_job-desc-container__txpYf")
-            ?.textContent?.trim() || "";
+            const skills = Array.from(
+              document.querySelectorAll(".styles_key-skill__GIPn_ a span"),
+            ).map((el) => el.textContent?.trim() || "");
 
-        return {
-          title,
-          company,
-          experience,
-          location,
-          skills,
-          description,
-        };
-      },
-    });
+            const description =
+              document
+                .querySelector(".styles_job-desc-container__txpYf")
+                ?.textContent?.trim() || "";
 
-    console.log(result[0].result);
+            return {
+              title,
+              company,
+              experience,
+              location,
+              skills,
+              description,
+            };
+          },
+        });
 
-    setJobData(result[0].result);
-  };
+        console.log(result[0].result);
+
+        setJobData(result[0].result);
+      } catch (error) {
+        console.log(error);
+      } finally {
+        setExtracting(false);
+      }
+    };
+
+    extractJob();
+  }, []);
 
   const analyze = async () => {
     try {
@@ -135,20 +150,17 @@ function App() {
         </div>
 
         <div className="rounded-lg border p-3">
-          <div className="text-sm text-gray-500">Job</div>
+          <div className="text-sm text-gray-500">Job Status</div>
 
           <div className="font-medium">
-            {jobData ? "✅ Extracted" : "❌ Missing"}
+            {extracting
+              ? "⏳ Extracting..."
+              : jobData
+                ? "✅ Extracted"
+                : "❌ Not Found"}
           </div>
         </div>
       </div>
-
-      <button
-        onClick={extractJob}
-        className="w-full rounded-lg bg-black px-4 py-2 text-white"
-      >
-        Extract Job
-      </button>
 
       {jobData && (
         <div className="mt-4 space-y-2 text-sm">
