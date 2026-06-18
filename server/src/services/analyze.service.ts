@@ -4,10 +4,7 @@ import { analyzeResume } from "./resume.service";
 import { analyzeJob } from "./job.service";
 import { reviewMatch } from "./review.service";
 
-export async function analyzeApplication(
-  resumeBuffer: Buffer,
-  jobDescription: string,
-) {
+export async function parseAndAnalyzeResume(resumeBuffer: Buffer) {
   const parser = new PDFParse({
     data: resumeBuffer,
   });
@@ -19,12 +16,24 @@ export async function analyzeApplication(
 
     const structuredResume = await analyzeResume(resumeText);
 
-    const structuredJob = await analyzeJob(jobDescription);
-
-    const review = await reviewMatch(structuredResume, structuredJob);
-
-    return review;
+    return {
+      structuredResume,
+    };
   } finally {
     await parser.destroy();
   }
+}
+
+export async function analyzeJobReview(
+  structuredResume: any,
+  jobDescription: string,
+) {
+  const structuredJob = await analyzeJob(jobDescription);
+
+  const review = await reviewMatch(structuredResume, structuredJob);
+
+  return {
+    review,
+    structuredJob,
+  };
 }
