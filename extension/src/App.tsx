@@ -23,6 +23,10 @@ function App() {
     string
   > | null>(null);
 
+  const [isNaukriPage, setIsNaukriPage] = useState(false);
+
+  const [currentDomain, setCurrentDomain] = useState("");
+
   useEffect(() => {
     chrome.storage.local.get(["structuredResume"], (result) => {
       if (result.structuredResume) {
@@ -31,76 +35,105 @@ function App() {
     });
   }, []);
 
+  const extractJob = async () => {
+    if (!isNaukriPage) {
+      return;
+    }
+
+    try {
+      setExtracting(true);
+
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (!tab.id) return;
+
+      const result = await chrome.scripting.executeScript({
+        target: {
+          tabId: tab.id,
+        },
+        func: () => {
+          const title =
+            document.querySelector("#job_header h1")?.textContent?.trim() || "";
+
+          const company =
+            document.querySelector("#job_header a")?.textContent?.trim() || "";
+
+          const experience =
+            document
+              .querySelector(
+                "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__exp-salary-container__NXsVd > div.styles_jhc__exp__k_giM > span",
+              )
+              ?.textContent?.trim() || "";
+
+          const location =
+            document
+              .querySelector(
+                "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__loc___Du2H > span > a",
+              )
+              ?.textContent?.trim() || "";
+
+          const skills = Array.from(
+            document.querySelectorAll(".styles_key-skill__GIPn_ a span"),
+          ).map((el) => el.textContent?.trim() || "");
+
+          const description =
+            document
+              .querySelector(".styles_job-desc-container__txpYf")
+              ?.textContent?.trim() || "";
+
+          return {
+            title,
+            company,
+            experience,
+            location,
+            skills,
+            description,
+          };
+        },
+      });
+
+      console.log(result[0].result);
+
+      setJobData(result[0].result);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   useEffect(() => {
-    const extractJob = async () => {
-      try {
-        setExtracting(true);
+    const checkCurrentSite = async () => {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
 
-        const [tab] = await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
-        });
+      if (!tab.url) return;
 
-        if (!tab.id) return;
+      const url = new URL(tab.url);
 
-        const result = await chrome.scripting.executeScript({
-          target: {
-            tabId: tab.id,
-          },
-          func: () => {
-            const title =
-              document.querySelector("#job_header h1")?.textContent?.trim() ||
-              "";
+      setCurrentDomain(url.hostname);
 
-            const company =
-              document.querySelector("#job_header a")?.textContent?.trim() ||
-              "";
+      const isNaukri = url.hostname.includes("naukri.com");
 
-            const experience =
-              document
-                .querySelector(
-                  "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__exp-salary-container__NXsVd > div.styles_jhc__exp__k_giM > span",
-                )
-                ?.textContent?.trim() || "";
+      setIsNaukriPage(isNaukri);
 
-            const location =
-              document
-                .querySelector(
-                  "#job_header > div.styles_jhc__top__BUxpc > div.styles_jhc__left__tg9m8 > div.styles_jhc__loc___Du2H > span > a",
-                )
-                ?.textContent?.trim() || "";
+      return isNaukri;
+    };
 
-            const skills = Array.from(
-              document.querySelectorAll(".styles_key-skill__GIPn_ a span"),
-            ).map((el) => el.textContent?.trim() || "");
+    const init = async () => {
+      const isNaukri = await checkCurrentSite();
 
-            const description =
-              document
-                .querySelector(".styles_job-desc-container__txpYf")
-                ?.textContent?.trim() || "";
-
-            return {
-              title,
-              company,
-              experience,
-              location,
-              skills,
-              description,
-            };
-          },
-        });
-
-        console.log(result[0].result);
-
-        setJobData(result[0].result);
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setExtracting(false);
+      if (isNaukri) {
+        await extractJob();
       }
     };
 
-    extractJob();
+    init();
   }, []);
 
   const uploadResume = async () => {
@@ -198,178 +231,198 @@ function App() {
 
   return (
     <div className="w-[420px] min-h-[600px] bg-white p-4">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold">AI Resume Reviewer</h1>
+      {!isNaukriPage && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <h3 className="font-semibold text-red-700">Unsupported Website</h3>
 
-        <p className="text-sm text-gray-500">Analyze Naukri jobs instantly</p>
-      </div>
+          <p className="mt-1 text-sm text-red-600">
+            This extension currently works only on Naukri.com job pages.
+          </p>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="rounded-lg border p-3">
-          <div className="text-sm text-gray-500">Resume</div>
-
-          <div className="font-medium">
-            {structuredResume || resume ? "✅ Uploaded" : "❌ Missing"}
-          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            Current site: {currentDomain}
+          </p>
         </div>
+      )}
 
-        <div className="rounded-lg border p-3">
-          <div className="text-sm text-gray-500">Job Status</div>
+      {isNaukriPage && (
+        <>
+          <div className="mb-4">
+            <h1 className="text-xl font-bold">AI Resume Reviewer</h1>
 
-          <div className="font-medium">
-            {extracting
-              ? "⏳ Extracting..."
-              : jobData
-                ? "✅ Extracted"
-                : "❌ Not Found"}
-          </div>
-        </div>
-      </div>
-
-      {jobData && (
-        <div className="mt-4 space-y-2 text-sm">
-          <div>
-            <strong>Title:</strong> {jobData.title}
-          </div>
-
-          <div>
-            <strong>Company:</strong> {jobData.company}
-          </div>
-
-          <div>
-            <strong>Experience:</strong> {jobData.experience}
-          </div>
-
-          <div>
-            <strong>Location:</strong> {jobData.location}
-          </div>
-
-          <div>
-            <strong>Skills:</strong>
-          </div>
-
-          <ul>
-            {jobData.skills?.map((skill: string) => (
-              <li key={skill}>{skill}</li>
-            ))}
-          </ul>
-
-          <div className="mt-3">
-            <strong>Job Description</strong>
-
-            <p className="mt-2 rounded-lg border p-3 text-sm">
-              {jobData.description}
+            <p className="text-sm text-gray-500">
+              Analyze Naukri jobs instantly
             </p>
           </div>
-        </div>
-      )}
 
-      {!structuredResume && (
-        <>
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="rounded-lg border p-3">
+              <div className="text-sm text-gray-500">Resume</div>
 
-              if (file) {
-                setResume(file);
-              }
-            }}
-          />
-
-          <button
-            onClick={uploadResume}
-            className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
-          >
-            Upload Resume
-          </button>
-        </>
-      )}
-
-      {structuredResume && (
-        <>
-          <div className="rounded-lg border p-3 mt-3">✅ Resume Ready</div>
-
-          <button
-            onClick={analyzeResume}
-            className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
-          >
-            Analyze Resume
-          </button>
-
-          <button
-            onClick={clearResume}
-            className="mt-2 w-full rounded-lg bg-red-600 px-4 py-2 text-white"
-          >
-            Clear Resume
-          </button>
-        </>
-      )}
-
-      {uploadingResume && (
-        <div className="mt-3 text-center">⏳ Uploading Resume...</div>
-      )}
-      {loading && <div className="mt-3 text-center">⏳ Analyzing...</div>}
-
-      {review && (
-        <>
-          {review && (
-            <div className="mt-4 rounded-xl border p-4">
-              <div className="text-sm text-gray-500">Match Score</div>
-
-              <div className="text-4xl font-bold">{review.matchScore}%</div>
+              <div className="font-medium">
+                {structuredResume || resume ? "✅ Uploaded" : "❌ Missing"}
+              </div>
             </div>
-          )}
 
-          {review?.strengths?.length > 0 && (
-            <div className="mt-4 rounded-xl border p-4">
-              <h3 className="font-semibold mb-2">Strengths</h3>
+            <div className="rounded-lg border p-3">
+              <div className="text-sm text-gray-500">Job Status</div>
 
-              <ul className="space-y-2">
-                {review.strengths.map((item) => (
-                  <li key={item}>✅ {item}</li>
+              <div className="font-medium">
+                {extracting
+                  ? "⏳ Extracting..."
+                  : jobData
+                    ? "✅ Extracted"
+                    : "❌ Not Found"}
+              </div>
+            </div>
+          </div>
+
+          {jobData && (
+            <div className="mt-4 space-y-2 text-sm">
+              <div>
+                <strong>Title:</strong> {jobData.title}
+              </div>
+
+              <div>
+                <strong>Company:</strong> {jobData.company}
+              </div>
+
+              <div>
+                <strong>Experience:</strong> {jobData.experience}
+              </div>
+
+              <div>
+                <strong>Location:</strong> {jobData.location}
+              </div>
+
+              <div>
+                <strong>Skills:</strong>
+              </div>
+
+              <ul>
+                {jobData.skills?.map((skill: string) => (
+                  <li key={skill}>{skill}</li>
                 ))}
               </ul>
-            </div>
-          )}
 
-          {review?.missingSkills?.length > 0 && (
-            <div className="mt-4 rounded-xl border p-4">
-              <h3 className="font-semibold mb-2">Missing Skills</h3>
+              <div className="mt-3">
+                <strong>Job Description</strong>
 
-              <ul className="space-y-2">
-                {review.missingSkills.map((item) => (
-                  <li key={item}>❌ {item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {review && (
-            <div className="mt-4 rounded-xl border p-4">
-              <h3 className="font-semibold mb-2">Suggestion</h3>
-
-              <div
-                className={`mt-3 rounded-lg p-3 font-medium ${
-                  review.shouldApply ? "bg-green-100" : "bg-red-100"
-                }`}
-              >
-                {review.shouldApply ? "🚀 Strong Apply" : "⚠️ Skip"}
+                <p className="mt-2 rounded-lg border p-3 text-sm">
+                  {jobData.description}
+                </p>
               </div>
             </div>
           )}
 
-          {review?.recommendations?.length > 0 && (
-            <div className="mt-4 rounded-xl border p-4">
-              <h3 className="font-semibold mb-2">Recommendations</h3>
+          {!structuredResume && (
+            <>
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
 
-              <ul className="space-y-2">
-                {review.recommendations.map((item) => (
-                  <li key={item}>💡 {item}</li>
-                ))}
-              </ul>
-            </div>
+                  if (file) {
+                    setResume(file);
+                  }
+                }}
+              />
+
+              <button
+                onClick={uploadResume}
+                className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
+              >
+                Upload Resume
+              </button>
+            </>
+          )}
+
+          {structuredResume && (
+            <>
+              <div className="rounded-lg border p-3 mt-3">✅ Resume Ready</div>
+
+              <button
+                onClick={analyzeResume}
+                className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
+              >
+                Analyze Resume
+              </button>
+
+              <button
+                onClick={clearResume}
+                className="mt-2 w-full rounded-lg bg-red-600 px-4 py-2 text-white"
+              >
+                Clear Resume
+              </button>
+            </>
+          )}
+
+          {uploadingResume && (
+            <div className="mt-3 text-center">⏳ Uploading Resume...</div>
+          )}
+          {loading && <div className="mt-3 text-center">⏳ Analyzing...</div>}
+
+          {review && (
+            <>
+              {review && (
+                <div className="mt-4 rounded-xl border p-4">
+                  <div className="text-sm text-gray-500">Match Score</div>
+
+                  <div className="text-4xl font-bold">{review.matchScore}%</div>
+                </div>
+              )}
+
+              {review?.strengths?.length > 0 && (
+                <div className="mt-4 rounded-xl border p-4">
+                  <h3 className="font-semibold mb-2">Strengths</h3>
+
+                  <ul className="space-y-2">
+                    {review.strengths.map((item) => (
+                      <li key={item}>✅ {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {review?.missingSkills?.length > 0 && (
+                <div className="mt-4 rounded-xl border p-4">
+                  <h3 className="font-semibold mb-2">Missing Skills</h3>
+
+                  <ul className="space-y-2">
+                    {review.missingSkills.map((item) => (
+                      <li key={item}>❌ {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {review && (
+                <div className="mt-4 rounded-xl border p-4">
+                  <h3 className="font-semibold mb-2">Suggestion</h3>
+
+                  <div
+                    className={`mt-3 rounded-lg p-3 font-medium ${
+                      review.shouldApply ? "bg-green-100" : "bg-red-100"
+                    }`}
+                  >
+                    {review.shouldApply ? "🚀 Strong Apply" : "⚠️ Skip"}
+                  </div>
+                </div>
+              )}
+
+              {review?.recommendations?.length > 0 && (
+                <div className="mt-4 rounded-xl border p-4">
+                  <h3 className="font-semibold mb-2">Recommendations</h3>
+
+                  <ul className="space-y-2">
+                    {review.recommendations.map((item) => (
+                      <li key={item}>💡 {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
