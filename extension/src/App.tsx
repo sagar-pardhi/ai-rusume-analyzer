@@ -16,14 +16,20 @@ function App() {
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
 
-  // useEffect(() => {
-  //   chrome.storage.local.get(["structuredResume"], (result) => {
-  //     if (result.structuredResume) {
-  //       setSavedResume(result.structuredResume);
-  //     }
-  //   });
-  // }, []);
+  const [structuredResume, setStructuredResume] = useState<Record<
+    string,
+    string
+  > | null>(null);
+
+  useEffect(() => {
+    chrome.storage.local.get(["structuredResume"], (result) => {
+      if (result.structuredResume) {
+        setStructuredResume(result.structuredResume as Record<string, string>);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const extractJob = async () => {
@@ -97,7 +103,7 @@ function App() {
     extractJob();
   }, []);
 
-  const analyze = async () => {
+  const uploadResume = async () => {
     try {
       if (!resume) {
         alert("Upload resume first");
@@ -109,15 +115,15 @@ function App() {
         return;
       }
 
-      setLoading(true);
+      setUploadingResume(true);
 
       const formData = new FormData();
 
       formData.append("resume", resume);
 
-      formData.append("jobDescription", jobData.description);
+      // formData.append("jobDescription", jobData.description);
 
-      const response = await fetch("http://localhost:5000/api/analyze", {
+      const response = await fetch("http://localhost:5000/api/upload-resume", {
         method: "POST",
         body: formData,
       });
@@ -131,16 +137,63 @@ function App() {
       console.log(data);
 
       setReview(data.data.review);
-      // chrome.storage.local.set({
-      //   structuredResume: data.data.structuredResume,
-      // });
+
+      chrome.storage.local.set({
+        structuredResume: data.data.structuredResume,
+      });
+
+      setStructuredResume(data.data.structuredResume);
     } catch (error) {
       console.error(error);
 
       alert("Failed to analyze");
     } finally {
+      setUploadingResume(false);
+    }
+  };
+
+  const analyzeResume = async () => {
+    try {
+      if (!structuredResume) {
+        alert("Upload resume first");
+        return;
+      }
+
+      if (!jobData?.description) {
+        alert("Job not found");
+        return;
+      }
+
+      setLoading(true);
+
+      const response = await fetch("http://localhost:5000/api/analyze-job", {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          structuredResume,
+          jobDescription: jobData.description,
+        }),
+      });
+
+      const data = await response.json();
+
+      setReview(data.data.review);
+    } catch (error) {
+      console.error(error);
+    } finally {
       setLoading(false);
     }
+  };
+
+  const clearResume = () => {
+    chrome.storage.local.remove("structuredResume");
+
+    setStructuredResume(null);
+    setReview(null);
   };
 
   return (
@@ -156,7 +209,7 @@ function App() {
           <div className="text-sm text-gray-500">Resume</div>
 
           <div className="font-medium">
-            {resume ? "✅ Uploaded" : "❌ Missing"}
+            {structuredResume || resume ? "✅ Uploaded" : "❌ Missing"}
           </div>
         </div>
 
@@ -211,26 +264,53 @@ function App() {
         </div>
       )}
 
-      <input
-        type="file"
-        accept=".pdf"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
+      {!structuredResume && (
+        <>
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
 
-          if (file) {
-            setResume(file);
-          }
-        }}
-      />
+              if (file) {
+                setResume(file);
+              }
+            }}
+          />
 
-      <button
-        onClick={analyze}
-        className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
-      >
-        Analyze Resume
-      </button>
+          <button
+            onClick={uploadResume}
+            className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
+          >
+            Upload Resume
+          </button>
+        </>
+      )}
 
-      {loading && <div>Analyzing Resume...</div>}
+      {structuredResume && (
+        <>
+          <div className="rounded-lg border p-3 mt-3">✅ Resume Ready</div>
+
+          <button
+            onClick={analyzeResume}
+            className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
+          >
+            Analyze Resume
+          </button>
+
+          <button
+            onClick={clearResume}
+            className="mt-2 w-full rounded-lg bg-red-600 px-4 py-2 text-white"
+          >
+            Clear Resume
+          </button>
+        </>
+      )}
+
+      {uploadingResume && (
+        <div className="mt-3 text-center">⏳ Uploading Resume...</div>
+      )}
+      {loading && <div className="mt-3 text-center">⏳ Analyzing...</div>}
 
       {review && (
         <>
@@ -267,12 +347,16 @@ function App() {
           )}
 
           {review && (
-            <div
-              className={`mt-3 rounded-lg p-3 font-medium ${
-                review.shouldApply ? "bg-green-100" : "bg-red-100"
-              }`}
-            >
-              {review.shouldApply ? "🚀 Strong Apply" : "⚠️ Skip"}
+            <div className="mt-4 rounded-xl border p-4">
+              <h3 className="font-semibold mb-2">Suggestion</h3>
+
+              <div
+                className={`mt-3 rounded-lg p-3 font-medium ${
+                  review.shouldApply ? "bg-green-100" : "bg-red-100"
+                }`}
+              >
+                {review.shouldApply ? "🚀 Strong Apply" : "⚠️ Skip"}
+              </div>
             </div>
           )}
 
