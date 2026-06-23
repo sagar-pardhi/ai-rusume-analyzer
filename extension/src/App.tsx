@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import type { JobDetails } from "./types/job";
 import { extractPdfText } from "./lib/pdf";
 import { analyzeResume } from "./ai/resume-agent";
+import { analyzeJob } from "./ai/job-agent";
+import type { JobData } from "./schemas/job.schema";
+// import type { JobData } from "./schemas/job.schema";
 
 interface ReviewResult {
   matchScore: number;
@@ -33,6 +36,8 @@ function App() {
   const [apiKey, setApiKey] = useState("");
 
   const [savedApiKey, setSavedApiKey] = useState("");
+
+  const [, setStructuredJob] = useState<JobData | null>(null);
 
   useEffect(() => {
     chrome.storage.local.get(["openaiApiKey"], (result) => {
@@ -71,10 +76,6 @@ function App() {
   };
 
   const extractJob = async () => {
-    if (!isNaukriPage) {
-      return;
-    }
-
     try {
       setExtracting(true);
 
@@ -197,6 +198,16 @@ function App() {
       setLoading(false);
       setStatus("");
     }
+  };
+
+  const handleAnalyzeJob = async () => {
+    if (!jobData?.description) return;
+
+    const result = await analyzeJob(jobData.description, savedApiKey);
+
+    console.log(result);
+
+    setStructuredJob(result);
   };
 
   const clearResume = () => {
@@ -352,6 +363,13 @@ function App() {
                   </button>
                 </>
               )}
+
+              <button
+                onClick={handleAnalyzeJob}
+                className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
+              >
+                Analyze Job
+              </button>
 
               {/* {resumeText && (
                 <textarea
