@@ -3,11 +3,10 @@ import type { JobDetails } from "./types/job";
 import { extractPdfText } from "./lib/pdf";
 import { analyzeResume } from "./ai/resume-agent";
 import { analyzeJob } from "./ai/job-agent";
-import type { JobData } from "./schemas/job.schema";
+// import type { JobData } from "./schemas/job.schema";
 import type { ReviewData } from "./schemas/review.schema";
 import { reviewMatch } from "./ai/review-agent";
 import type { ResumeData } from "./schemas/resume.schema";
-// import type { JobData } from "./schemas/job.schema";
 
 function App() {
   const [jobData, setJobData] = useState<JobDetails | null | undefined>(null);
@@ -22,7 +21,7 @@ function App() {
   const [status, setStatus] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [savedApiKey, setSavedApiKey] = useState("");
-  const [structuredJob, setStructuredJob] = useState<JobData | null>(null);
+  // const [structuredJob, setStructuredJob] = useState<JobData | null>(null);
 
   useEffect(() => {
     chrome.storage.local.get(["openaiApiKey"], (result) => {
@@ -62,6 +61,8 @@ function App() {
 
   const extractJob = async () => {
     try {
+      console.log("Extracting Job...");
+
       setExtracting(true);
 
       const [tab] = await chrome.tabs.query({
@@ -120,8 +121,9 @@ function App() {
 
       setJobData(result[0].result);
     } catch (error) {
-      console.log(error);
+      console.log("Error Extracting Job:", error);
     } finally {
+      console.log("Extracting Job Done");
       setExtracting(false);
     }
   };
@@ -163,6 +165,7 @@ function App() {
     if (!file) return;
 
     try {
+      console.log("Extracting Resume...");
       setLoading(true);
       setStatus("Extracting PDF...");
 
@@ -178,8 +181,9 @@ function App() {
         structuredResume,
       });
     } catch (error) {
-      console.error(error);
+      console.error("Error Extracting Resume:", error);
     } finally {
+      console.log("Extracting Resume Done");
       setLoading(false);
       setStatus("");
     }
@@ -191,27 +195,31 @@ function App() {
     if (!jobData?.description) return;
 
     try {
+      console.log("Analyzing Job Fit...");
       setLoading(true);
-      setStatus("Analyzing Job Fit...");
+
+      console.log("Analyzeing Job Description...", jobData.description);
       const analyzeJobresult = await analyzeJob(
         jobData.description,
         savedApiKey,
       );
+      // setStructuredJob(analyzeJobresult);
+      console.log("Analyzed Job Data:", analyzeJobresult);
 
-      setStructuredJob(analyzeJobresult);
+      if (!analyzeJobresult) return;
 
-      if (!structuredJob) return;
-
+      setStatus("Analyzing Job Fit...");
       const result = await reviewMatch(
         structuredResume,
-        structuredJob,
+        analyzeJobresult,
         savedApiKey,
       );
 
       setReview(result);
     } catch (error) {
-      console.log(error);
+      console.error("Error Analyzing Job Fit:", error);
     } finally {
+      console.log("Analyzing Job Fit Done");
       setLoading(false);
       setStatus("");
     }
