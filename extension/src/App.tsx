@@ -3,41 +3,25 @@ import type { JobDetails } from "./types/job";
 import { extractPdfText } from "./lib/pdf";
 import { analyzeResume } from "./ai/resume-agent";
 import { analyzeJob } from "./ai/job-agent";
-import type { JobData } from "./schemas/job.schema";
 // import type { JobData } from "./schemas/job.schema";
-
-interface ReviewResult {
-  matchScore: number;
-  strengths: string[];
-  missingSkills: string[];
-  recommendations: string[];
-  shouldApply: boolean;
-  summary: string;
-}
+import type { ReviewData } from "./schemas/review.schema";
+import { reviewMatch } from "./ai/review-agent";
+import type { ResumeData } from "./schemas/resume.schema";
 
 function App() {
   const [jobData, setJobData] = useState<JobDetails | null | undefined>(null);
-  // const [resume, setResume] = useState<File | null>(null);
-  const [review, setReview] = useState<ReviewResult | null>(null);
+  const [review, setReview] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
-
-  const [structuredResume, setStructuredResume] = useState<Record<
-    string,
-    string
-  > | null>(null);
-
+  const [structuredResume, setStructuredResume] = useState<ResumeData | null>(
+    null,
+  );
   const [isNaukriPage, setIsNaukriPage] = useState(false);
-
   const [currentDomain, setCurrentDomain] = useState("");
-  // const [resumeText, setResumeText] = useState("");
   const [status, setStatus] = useState("");
-
   const [apiKey, setApiKey] = useState("");
-
   const [savedApiKey, setSavedApiKey] = useState("");
-
-  const [, setStructuredJob] = useState<JobData | null>(null);
+  // const [structuredJob, setStructuredJob] = useState<JobData | null>(null);
 
   useEffect(() => {
     chrome.storage.local.get(["openaiApiKey"], (result) => {
@@ -50,7 +34,7 @@ function App() {
   useEffect(() => {
     chrome.storage.local.get(["structuredResume"], (result) => {
       if (result.structuredResume) {
-        setStructuredResume(result.structuredResume as Record<string, string>);
+        setStructuredResume(result.structuredResume as ResumeData);
       }
     });
   }, []);
@@ -77,6 +61,8 @@ function App() {
 
   const extractJob = async () => {
     try {
+      console.log("Extracting Job...");
+
       setExtracting(true);
 
       const [tab] = await chrome.tabs.query({
@@ -135,8 +121,9 @@ function App() {
 
       setJobData(result[0].result);
     } catch (error) {
-      console.log(error);
+      console.log("Error Extracting Job:", error);
     } finally {
+      console.log("Extracting Job Done");
       setExtracting(false);
     }
   };
@@ -178,6 +165,7 @@ function App() {
     if (!file) return;
 
     try {
+      console.log("Extracting Resume...");
       setLoading(true);
       setStatus("Extracting PDF...");
 
@@ -193,21 +181,48 @@ function App() {
         structuredResume,
       });
     } catch (error) {
-      console.error(error);
+      console.error("Error Extracting Resume:", error);
     } finally {
+      console.log("Extracting Resume Done");
       setLoading(false);
       setStatus("");
     }
   };
 
-  const handleAnalyzeJob = async () => {
+  const analyzeJobFit = async () => {
+    if (!structuredResume) return;
+
     if (!jobData?.description) return;
 
-    const result = await analyzeJob(jobData.description, savedApiKey);
+    try {
+      console.log("Analyzing Job Fit...");
+      setLoading(true);
 
-    console.log(result);
+      console.log("Analyzeing Job Description...", jobData.description);
+      const analyzeJobresult = await analyzeJob(
+        jobData.description,
+        savedApiKey,
+      );
+      // setStructuredJob(analyzeJobresult);
+      console.log("Analyzed Job Data:", analyzeJobresult);
 
-    setStructuredJob(result);
+      if (!analyzeJobresult) return;
+
+      setStatus("Analyzing Job Fit...");
+      const result = await reviewMatch(
+        structuredResume,
+        analyzeJobresult,
+        savedApiKey,
+      );
+
+      setReview(result);
+    } catch (error) {
+      console.error("Error Analyzing Job Fit:", error);
+    } finally {
+      console.log("Analyzing Job Fit Done");
+      setLoading(false);
+      setStatus("");
+    }
   };
 
   const clearResume = () => {
@@ -305,6 +320,28 @@ function App() {
                 </div>
               </div>
 
+              {structuredResume && (
+                <>
+                  <button
+                    onClick={clearResume}
+                    className="mt-2 w-full rounded-lg bg-red-600 px-4 py-2 text-white"
+                  >
+                    Clear Resume
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={analyzeJobFit}
+                className="mt-2 w-full rounded-lg bg-green-600 px-4 py-2 text-white"
+              >
+                Analyze Job Fit
+              </button>
+
+              {loading && (
+                <div className="mt-3 text-center">{`⏳ ${status}`}</div>
+              )}
+
               {jobData && (
                 <div className="mt-4 space-y-2 text-sm">
                   <div>
@@ -352,35 +389,6 @@ function App() {
                   />
                 </>
               )}
-
-              {structuredResume && (
-                <>
-                  <button
-                    onClick={clearResume}
-                    className="mt-2 w-full rounded-lg bg-red-600 px-4 py-2 text-white"
-                  >
-                    Clear Resume
-                  </button>
-                </>
-              )}
-
-              <button
-                onClick={handleAnalyzeJob}
-                className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-white"
-              >
-                Analyze Job
-              </button>
-
-              {/* {resumeText && (
-                <textarea
-                  value={resumeText}
-                  readOnly
-                  rows={10}
-                  className="w-full border mt-2"
-                />
-              )} */}
-
-              {loading && <div className="mt-3 text-center">{status}</div>}
 
               {review && (
                 <>
