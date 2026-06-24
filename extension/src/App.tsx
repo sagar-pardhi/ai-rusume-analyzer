@@ -3,10 +3,15 @@ import type { JobDetails } from "./types/job";
 import { extractPdfText } from "./lib/pdf";
 import { analyzeResume } from "./ai/resume-agent";
 import { analyzeJob } from "./ai/job-agent";
-// import type { JobData } from "./schemas/job.schema";
 import type { ReviewData } from "./schemas/review.schema";
 import { reviewMatch } from "./ai/review-agent";
 import type { ResumeData } from "./schemas/resume.schema";
+import { ApiKeySetup } from "./components/ApiKeySetup";
+import { UnsupportedSite } from "./components/UnsupportedSite";
+import { StatusCards } from "./components/StatusCards";
+import { JobDetailsCard } from "./components/JobDetailsCard";
+import { ResumeUpload } from "./components/ResumeUpload";
+import { ReviewResults } from "./components/ReviewResults";
 
 function App() {
   const [jobData, setJobData] = useState<JobDetails | null | undefined>(null);
@@ -21,7 +26,6 @@ function App() {
   const [status, setStatus] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [savedApiKey, setSavedApiKey] = useState("");
-  // const [structuredJob, setStructuredJob] = useState<JobData | null>(null);
 
   useEffect(() => {
     chrome.storage.local.get(["openaiApiKey"], (result) => {
@@ -203,7 +207,6 @@ function App() {
         jobData.description,
         savedApiKey,
       );
-      // setStructuredJob(analyzeJobresult);
       console.log("Analyzed Job Data:", analyzeJobresult);
 
       if (!analyzeJobresult) return;
@@ -235,46 +238,17 @@ function App() {
   return (
     <div className="w-[420px] min-h-[600px] bg-white p-4">
       {!savedApiKey && (
-        <div className="rounded-lg border p-4">
-          <h2 className="font-semibold">OpenAI API Key</h2>
-
-          <p className="text-sm text-gray-500 mt-1">
-            Enter your OpenAI API key to use the extension.
-          </p>
-
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-..."
-            className="mt-3 w-full rounded border p-2"
-          />
-
-          <button
-            onClick={saveApiKey}
-            className="mt-3 w-full rounded bg-black px-4 py-2 text-white"
-          >
-            Save API Key
-          </button>
-        </div>
+        <ApiKeySetup
+          apiKey={apiKey}
+          onApiKeyChange={setApiKey}
+          onSave={saveApiKey}
+        />
       )}
 
       {savedApiKey && (
         <>
           {!isNaukriPage && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <h3 className="font-semibold text-red-700">
-                Unsupported Website
-              </h3>
-
-              <p className="mt-1 text-sm text-red-600">
-                This extension currently works only on Naukri.com job pages.
-              </p>
-
-              <p className="mt-2 text-xs text-gray-500">
-                Current site: {currentDomain}
-              </p>
-            </div>
+            <UnsupportedSite currentDomain={currentDomain} />
           )}
 
           {isNaukriPage && (
@@ -287,48 +261,20 @@ function App() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="rounded-lg border p-3">
-                  <div className="font-medium">✅ OpenAI Connected</div>
-
-                  <button
-                    onClick={clearApiKey}
-                    className="mt-2 text-sm text-red-500"
-                  >
-                    Change API Key
-                  </button>
-                </div>
-
-                <div className="rounded-lg border p-3">
-                  <div className="text-sm text-gray-500">Resume</div>
-
-                  <div className="font-medium">
-                    {structuredResume ? "✅ Uploaded" : "❌ Missing"}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border p-3">
-                  <div className="text-sm text-gray-500">Job Status</div>
-
-                  <div className="font-medium">
-                    {extracting
-                      ? "⏳ Extracting..."
-                      : jobData
-                        ? "✅ Extracted"
-                        : "❌ Not Found"}
-                  </div>
-                </div>
-              </div>
+              <StatusCards
+                onClearApiKey={clearApiKey}
+                hasResume={!!structuredResume}
+                extracting={extracting}
+                hasJobData={!!jobData}
+              />
 
               {structuredResume && (
-                <>
-                  <button
-                    onClick={clearResume}
-                    className="mt-2 w-full rounded-lg bg-red-600 px-4 py-2 text-white"
-                  >
-                    Clear Resume
-                  </button>
-                </>
+                <button
+                  onClick={clearResume}
+                  className="mt-2 w-full rounded-lg bg-red-600 px-4 py-2 text-white"
+                >
+                  Clear Resume
+                </button>
               )}
 
               <button
@@ -342,117 +288,13 @@ function App() {
                 <div className="mt-3 text-center">{`⏳ ${status}`}</div>
               )}
 
-              {jobData && (
-                <div className="mt-4 space-y-2 text-sm">
-                  <div>
-                    <strong>Title:</strong> {jobData.title}
-                  </div>
-
-                  <div>
-                    <strong>Company:</strong> {jobData.company}
-                  </div>
-
-                  <div>
-                    <strong>Experience:</strong> {jobData.experience}
-                  </div>
-
-                  <div>
-                    <strong>Location:</strong> {jobData.location}
-                  </div>
-
-                  <div>
-                    <strong>Skills:</strong>
-                  </div>
-
-                  <ul>
-                    {jobData.skills?.map((skill: string) => (
-                      <li key={skill}>{skill}</li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-3">
-                    <strong>Job Description</strong>
-
-                    <p className="mt-2 rounded-lg border p-3 text-sm">
-                      {jobData.description}
-                    </p>
-                  </div>
-                </div>
-              )}
+              {jobData && <JobDetailsCard jobData={jobData} />}
 
               {!structuredResume && (
-                <>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleResumeUpload}
-                  />
-                </>
+                <ResumeUpload onUpload={handleResumeUpload} />
               )}
 
-              {review && (
-                <>
-                  {review && (
-                    <div className="mt-4 rounded-xl border p-4">
-                      <div className="text-sm text-gray-500">Match Score</div>
-
-                      <div className="text-4xl font-bold">
-                        {review.matchScore}%
-                      </div>
-                    </div>
-                  )}
-
-                  {review?.strengths?.length > 0 && (
-                    <div className="mt-4 rounded-xl border p-4">
-                      <h3 className="font-semibold mb-2">Strengths</h3>
-
-                      <ul className="space-y-2">
-                        {review.strengths.map((item) => (
-                          <li key={item}>✅ {item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {review?.missingSkills?.length > 0 && (
-                    <div className="mt-4 rounded-xl border p-4">
-                      <h3 className="font-semibold mb-2">Missing Skills</h3>
-
-                      <ul className="space-y-2">
-                        {review.missingSkills.map((item) => (
-                          <li key={item}>❌ {item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {review && (
-                    <div className="mt-4 rounded-xl border p-4">
-                      <h3 className="font-semibold mb-2">Suggestion</h3>
-
-                      <div
-                        className={`mt-3 rounded-lg p-3 font-medium ${
-                          review.shouldApply ? "bg-green-100" : "bg-red-100"
-                        }`}
-                      >
-                        {review.shouldApply ? "🚀 Strong Apply" : "⚠️ Skip"}
-                      </div>
-                    </div>
-                  )}
-
-                  {review?.recommendations?.length > 0 && (
-                    <div className="mt-4 rounded-xl border p-4">
-                      <h3 className="font-semibold mb-2">Recommendations</h3>
-
-                      <ul className="space-y-2">
-                        {review.recommendations.map((item) => (
-                          <li key={item}>💡 {item}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
+              {review && <ReviewResults review={review} />}
             </>
           )}
         </>
