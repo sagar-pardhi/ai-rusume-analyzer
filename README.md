@@ -423,6 +423,6 @@ MIT License
 
 # Author
 
-**Your Name**
+**Sagar Pardhi**
 
-GitHub: https://github.com/yourusername
+GitHub: https://github.com/sagar-pardhi
